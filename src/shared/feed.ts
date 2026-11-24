@@ -38,10 +38,14 @@ export function isYearTitle(title: string): boolean {
   return YEAR_TITLE.test(title.trim());
 }
 
+/** Standard Wikimedia thumbnail widths; the photo is shown full-bleed, so prefer the largest. */
+const THUMB_WIDTHS = [1280, 960, 640];
+
 /** Wikimedia thumbnails can be re-requested at a larger width by rewriting the URL. */
-export function upscaleThumbnail(thumb: Thumbnail, original: Thumbnail | undefined, width = 640): Thumbnail {
+export function upscaleThumbnail(thumb: Thumbnail, original: Thumbnail | undefined): Thumbnail {
   const match = /\/(\d+)px-[^/]+$/.exec(thumb.source);
-  if (!match || !original?.width || original.width < width || Number(match[1]) >= width) return thumb;
+  const width = THUMB_WIDTHS.find((w) => (original?.width ?? 0) >= w);
+  if (!original || !match || !width || Number(match[1]) >= width) return thumb;
   const ratio = original.height && original.width ? original.height / original.width : undefined;
   return {
     source: thumb.source.replace(/\/\d+px-([^/]+)$/, `/${width}px-$1`),

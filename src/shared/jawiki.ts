@@ -162,7 +162,7 @@ async function lookupPages(titles: string[]): Promise<Map<string, PageInfo>> {
       redirects: '1',
       prop: 'pageimages|description',
       piprop: 'thumbnail',
-      pithumbsize: '640',
+      pithumbsize: '1280',
       pilimit: '50',
       titles: batch.join('|'),
     });

@@ -21,7 +21,8 @@ describe('isYearTitle', () => {
 describe('upscaleThumbnail', () => {
   const thumb = { source: 'https://upload.wikimedia.org/a/b/320px-X.jpg', width: 320, height: 240 };
   it('requests a larger rendition when the original is big enough', () => {
-    expect(upscaleThumbnail(thumb, { source: '', width: 2000, height: 1500 }).source).toContain('/640px-X.jpg');
+    expect(upscaleThumbnail(thumb, { source: '', width: 2000, height: 1500 }).source).toContain('/1280px-X.jpg');
+    expect(upscaleThumbnail(thumb, { source: '', width: 1000, height: 750 }).source).toContain('/960px-X.jpg');
   });
   it('keeps the thumbnail when the original is small', () => {
     expect(upscaleThumbnail(thumb, { source: '', width: 400, height: 300 })).toBe(thumb);

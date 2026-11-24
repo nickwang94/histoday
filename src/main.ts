@@ -1,244 +1,211 @@
+import '@fontsource/sofia-sans-extra-condensed/700.css';
+import '@fontsource/sofia-sans/500.css';
+import '@fontsource/sofia-sans/600.css';
+import '@fontsource/sofia-sans/800.css';
 import './styles.css';
 import { loadOnThisDay } from './api';
-import { Deck } from './deck';
 import { detectLang, STRINGS, type Strings } from './i18n';
 import type { HistoryItem, Kind, Lang, OnThisDay } from './shared/types';
-import { isLang, isValidMonthDay, KINDS, LANGS, pad2 } from './shared/types';
+import { isLang, KINDS, LANGS } from './shared/types';
+import { Flaps, Stage } from './stage';
 
-type Attrs = Record<string, string | boolean | undefined>;
+const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
-function h<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  attrs: Attrs = {},
-  ...children: (Node | string | null | undefined | false)[]
-): HTMLElementTagNameMap[K] {
-  const el = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) {
-    if (v === undefined || v === false) continue;
-    el.setAttribute(k, v === true ? '' : v);
-  }
-  for (const c of children) if (c) el.append(c);
-  return el;
-}
+const params = new URLSearchParams(location.search);
+const stored = localStorage.getItem('histoday.lang');
+const today = new Date();
 
-const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
-
-interface State {
-  lang: Lang;
-  month: number;
-  day: number;
-  kind: Kind;
-}
-
-function initialState(): State {
-  const params = new URLSearchParams(location.search);
-  const stored = localStorage.getItem('histoday.lang');
-  const lang = isLang(params.get('lang')) ? (params.get('lang') as Lang) : isLang(stored) ? stored : detectLang();
-  const now = new Date();
-  let month = now.getMonth() + 1;
-  let day = now.getDate();
-  const m = /^(\d{1,2})-(\d{1,2})$/.exec(params.get('date') ?? '');
-  if (m && isValidMonthDay(Number(m[1]), Number(m[2]))) {
-    month = Number(m[1]);
-    day = Number(m[2]);
-  }
-  const kind = (KINDS as readonly string[]).includes(params.get('kind') ?? '') ? (params.get('kind') as Kind) : 'events';
-  return { lang, month, day, kind };
-}
-
-const state = initialState();
+const state = {
+  lang: (isLang(params.get('lang')) ? params.get('lang') : isLang(stored) ? stored : detectLang()) as Lang,
+  kind: ((KINDS as readonly string[]).includes(params.get('kind') ?? '') ? params.get('kind') : 'events') as Kind,
+  month: today.getMonth() + 1,
+  day: today.getDate(),
+};
 let data: OnThisDay | null = null;
-let loadToken = 0;
+let token = 0;
 const t = (): Strings => STRINGS[state.lang];
 
-function syncUrl(): void {
-  const params = new URLSearchParams();
-  params.set('lang', state.lang);
-  params.set('date', `${pad2(state.month)}-${pad2(state.day)}`);
-  if (state.kind !== 'events') params.set('kind', state.kind);
-  history.replaceState(null, '', `${location.pathname}?${params}`);
+type Card = Omit<HistoryItem, 'image'> & { image?: string };
+const items = (): Card[] =>
+  (data?.items[state.kind] ?? []).map((it) => ({ ...it, image: it.image?.source }));
+
+const flaps = new Flaps($('flaps'), 4);
+const headline = $('headline');
+const article = $<HTMLAnchorElement>('article');
+const counter = $('counter');
+const local = $('local');
+const progressFill = $('progress-fill');
+const status = $('status');
+const storyText = $('story-text');
+
+/** Visual length: CJK glyphs are roughly twice as wide as condensed Latin. */
+function visualLength(text: string): number {
+  let n = 0;
+  for (const ch of text) n += /[\u3000-\u9fff\uac00-\ud7af\uff00-\uffef]/.test(ch) ? 1.9 : 1;
+  return n;
 }
 
-function formatDate(): string {
-  // A leap year keeps Feb 29 valid.
-  const d = new Date(2024, state.month - 1, state.day);
-  return new Intl.DateTimeFormat(t().locale, { month: 'long', day: 'numeric' }).format(d);
+function yearDigits(year: number | null): string {
+  if (year === null) return '';
+  return String(Math.abs(year)).slice(-4);
 }
 
-function yearsAgo(year: number): number {
-  const now = new Date().getFullYear();
-  // There is no year 0 between 1 BC and AD 1.
-  return year < 0 ? now - year - 1 : now - year;
+function pad(n: number, width: number): string {
+  return String(n).padStart(width, '0');
 }
 
-function mediaFallback(item: HistoryItem): HTMLElement {
-  return h(
-    'div',
-    { class: 'media-fallback' },
-    h('span', { class: 'media-fallback-year' }, item.year === null ? '?' : t().year(item.year)),
-    h('small', {}, t().noImage),
-  );
+function renderCounter(i: number): void {
+  const list = items();
+  const n = list.length;
+  const w = Math.max(2, String(n).length);
+  counter.textContent = n ? `${pad(i + 1, w)} / ${pad(n, w)}` : '';
+  progressFill.style.transform = `scaleX(${n ? (i + 1) / n : 0})`;
+  const item = list[i];
+  local.hidden = !item?.local;
+  local.textContent = t().localTag;
+  $<HTMLButtonElement>('prev').disabled = i <= 0;
+  $<HTMLButtonElement>('next').disabled = i >= n - 1;
+  flaps.set(yearDigits(item?.year ?? null));
+  const label = item?.year != null ? t().yearLabel(item.year) : '';
+  $('flaps').setAttribute('aria-label', label);
+  $('flaps').dataset.era = item?.year != null && item.year < 0 ? (state.lang === 'en' ? 'BC' : state.lang === 'zh' ? '公元前' : '紀元前') : '';
+  for (const it of list.slice(i + 1, i + 3)) if (it.image) new Image().src = it.image;
 }
 
-function renderCard(item: HistoryItem): HTMLElement {
-  const s = t();
+function renderText(item: Card): void {
+  headline.textContent = item.text;
+  const len = visualLength(item.text);
+  headline.dataset.size = len <= 56 ? 'xl' : len <= 96 ? 'l' : len <= 150 ? 'm' : 's';
   const main = item.pages[0];
-
-  let media: HTMLElement;
-  if (item.image) {
-    const img = h('img', {
-      src: item.image.source,
-      alt: main?.title ?? '',
-      loading: 'lazy',
-      decoding: 'async',
-      draggable: 'false',
-      referrerpolicy: 'no-referrer',
-    });
-    img.addEventListener('error', () => img.replaceWith(mediaFallback(item)), { once: true });
-    media = h('div', { class: 'card-media' }, img);
+  if (main) {
+    article.hidden = false;
+    article.href = main.url;
+    article.textContent = main.description ? `${main.title}, ${main.description}` : main.title;
   } else {
-    media = h('div', { class: 'card-media is-empty' }, mediaFallback(item));
+    article.hidden = true;
   }
-
-  const head = h(
-    'div',
-    { class: 'card-head' },
-    item.year !== null && h('span', { class: 'year' }, s.year(item.year)),
-    item.year !== null && h('span', { class: 'ago' }, s.yearsAgo(yearsAgo(item.year))),
-    item.local && h('span', { class: 'tag', title: s.localHint }, s.localTag),
-  );
-
-  const page =
-    main &&
-    h(
-      'div',
-      { class: 'card-page' },
-      h('strong', {}, main.title),
-      main.description && h('span', { class: 'desc' }, main.description),
-      main.extract && h('p', { class: 'extract' }, main.extract),
-    );
-
-  const read =
-    item.url && h('a', { class: 'read', href: item.url, target: '_blank', rel: 'noopener' }, `${s.readMore} →`);
-
-  return h(
-    'article',
-    { lang: s.htmlLang },
-    media,
-    h('div', { class: 'card-body' }, head, h('p', { class: 'card-text' }, item.text), page, read),
-  );
 }
 
-const deckEl = $('#deck');
-const statusEl = $('#status');
-const counterEl = $('#counter');
-const prevBtn = $<HTMLButtonElement>('#prev');
-const nextBtn = $<HTMLButtonElement>('#next');
-
-const deck = new Deck<HistoryItem>(deckEl, {
-  render: renderCard,
-  key: (item) => item.id,
-  onChange: (i) => {
-    const items = currentItems();
-    counterEl.textContent = items.length ? t().counter(i + 1, items.length) : '';
-    prevBtn.disabled = i <= 0;
-    nextBtn.disabled = i >= items.length - 1;
-    for (const it of items.slice(i + 1, i + 4)) if (it.image) new Image().src = it.image.source;
-  },
+const stage = new Stage<Card>({
+  surface: $('stage'),
+  text: storyText,
+  backdrop: [...document.querySelectorAll<HTMLImageElement>('.backdrop-img')] as [HTMLImageElement, HTMLImageElement],
+  render: (item) => renderText(item),
+  onCommit: (i) => renderCounter(i),
 });
 
-function currentItems(): HistoryItem[] {
-  return data?.items[state.kind] ?? [];
-}
-
 function setStatus(kind: 'loading' | 'error' | 'empty' | null): void {
-  statusEl.replaceChildren();
-  statusEl.hidden = kind === null;
-  deckEl.classList.toggle('is-busy', kind !== null);
-  if (kind === 'loading') {
-    statusEl.append(h('div', { class: 'spinner', 'aria-hidden': 'true' }), h('p', {}, t().loading));
-  } else if (kind === 'error') {
-    const retry = h('button', { class: 'btn', type: 'button' }, t().retry);
-    retry.addEventListener('click', () => void load());
-    statusEl.append(h('p', {}, t().error), retry);
-  } else if (kind === 'empty') {
-    statusEl.append(h('p', {}, t().empty));
+  status.replaceChildren();
+  status.hidden = kind === null;
+  storyText.hidden = kind !== null;
+  document.body.dataset.state = kind ?? 'ready';
+  if (kind === null) return;
+  const p = document.createElement('p');
+  p.textContent = kind === 'loading' ? t().loading : kind === 'error' ? t().error : t().empty;
+  status.append(p);
+  if (kind === 'error') {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn';
+    b.textContent = t().retry;
+    b.addEventListener('click', () => void load());
+    status.append(b);
   }
 }
 
-function showDeck(): void {
-  const items = currentItems();
-  deck.setItems(items, 0);
-  setStatus(items.length ? null : 'empty');
+function show(): void {
+  const list = items();
+  stage.setItems(list, 0);
+  setStatus(list.length ? null : 'empty');
+  renderCounter(0);
 }
 
 async function load(): Promise<void> {
-  const token = ++loadToken;
+  const mine = ++token;
   data = null;
-  deck.setItems([]);
-  counterEl.textContent = '';
+  stage.setItems([]);
+  renderCounter(0);
+  flaps.set('    ', false);
   setStatus('loading');
   try {
     const result = await loadOnThisDay(state.lang, state.month, state.day);
-    if (token !== loadToken) return;
+    if (mine !== token) return;
     data = result;
-    showDeck();
+    show();
   } catch (err) {
-    if (token !== loadToken) return;
+    if (mine !== token) return;
     console.error(err);
     setStatus('error');
   }
 }
 
+function syncUrl(): void {
+  const q = new URLSearchParams(location.search);
+  q.set('lang', state.lang);
+  if (state.kind === 'events') q.delete('kind');
+  else q.set('kind', state.kind);
+  history.replaceState(null, '', `${location.pathname}?${q}`);
+}
+
 function renderChrome(): void {
   const s = t();
   document.documentElement.lang = s.htmlLang;
-  document.title = `${s.title} · ${formatDate()}`;
-  $('#title').textContent = s.title;
-  $('#tagline').textContent = s.tagline;
-  $('#date-label').textContent = formatDate();
-  $('#date-input').setAttribute('aria-label', s.pickDate);
-  $('#prev-day').setAttribute('aria-label', s.prevDay);
-  $('#prev-day').title = s.prevDay;
-  $('#next-day').setAttribute('aria-label', s.nextDay);
-  $('#next-day').title = s.nextDay;
-  $('#today').textContent = s.today;
-  prevBtn.setAttribute('aria-label', s.prev);
-  prevBtn.title = s.prev;
-  nextBtn.setAttribute('aria-label', s.next);
-  nextBtn.title = s.next;
-  $('#hint').textContent = s.hint;
-  $('#footer-text').textContent = s.footer;
-  $('#local-hint').textContent = s.localHint;
+  document.title = `histoday · ${s.title}`;
+  const date = $('date');
+  date.textContent = s.date(state.month, state.day);
+  date.setAttribute('datetime', `${today.getFullYear()}-${pad(state.month, 2)}-${pad(state.day, 2)}`);
+  $('open-settings').setAttribute('aria-label', s.settings);
+  $('prev').setAttribute('aria-label', s.prev);
+  $('next').setAttribute('aria-label', s.next);
+  $('settings-title').textContent = s.settings;
+  $('close-settings').setAttribute('aria-label', s.close);
+  $('language-title').textContent = s.language;
+  $('about-title').textContent = s.about;
+  $('about-body').textContent = s.aboutBody;
+  $('local-hint').textContent = s.localHint;
+  $('source-note').textContent = s.source;
+  $<HTMLAnchorElement>('source-link').href = data?.source.startsWith('https://') ? data.source : `https://${state.lang}.wikipedia.org/`;
 
-  const input = $<HTMLInputElement>('#date-input');
-  input.value = `${new Date().getFullYear()}-${pad2(state.month)}-${pad2(state.day)}`;
+  const tabs = $('tabs');
+  tabs.querySelectorAll('.tab').forEach((n) => n.remove());
+  KINDS.forEach((k) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'tab';
+    b.role = 'tab';
+    b.setAttribute('aria-selected', String(k === state.kind));
+    const label = document.createElement('span');
+    label.textContent = s.kinds[k];
+    b.appendChild(label);
+    b.addEventListener('click', () => setKind(k));
+    tabs.appendChild(b);
+  });
+  requestAnimationFrame(placeTabInk);
 
-  const langs = $('#langs');
+  const langs = $('langs');
   langs.replaceChildren(
     ...LANGS.map((l) => {
-      const b = h(
-        'button',
-        { type: 'button', class: 'chip', lang: STRINGS[l].htmlLang, 'aria-pressed': String(l === state.lang) },
-        STRINGS[l].label,
-      );
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'lang';
+      b.role = 'radio';
+      b.lang = STRINGS[l].htmlLang;
+      b.setAttribute('aria-checked', String(l === state.lang));
+      b.textContent = STRINGS[l].label;
       b.addEventListener('click', () => setLang(l));
       return b;
     }),
   );
+}
 
-  const kinds = $('#kinds');
-  kinds.replaceChildren(
-    ...KINDS.map((k) => {
-      const b = h(
-        'button',
-        { type: 'button', role: 'tab', class: 'tab', 'aria-selected': String(k === state.kind) },
-        s.kinds[k],
-      );
-      b.addEventListener('click', () => setKind(k));
-      return b;
-    }),
-  );
+function placeTabInk(): void {
+  const active = document.querySelector<HTMLElement>('.tab[aria-selected="true"] span');
+  const ink = document.querySelector<HTMLElement>('.tab-ink');
+  if (!active || !ink) return;
+  const box = active.getBoundingClientRect();
+  const origin = ink.parentElement!.getBoundingClientRect().left;
+  ink.style.transform = `translateX(${box.left - origin - 6}px)`;
+  ink.style.width = `${box.width + 12}px`;
 }
 
 function setLang(lang: Lang): void {
@@ -255,59 +222,26 @@ function setKind(kind: Kind): void {
   state.kind = kind;
   syncUrl();
   renderChrome();
-  if (data) showDeck();
+  if (data) show();
 }
 
-function setDate(month: number, day: number): void {
-  if (month === state.month && day === state.day) return;
-  state.month = month;
-  state.day = day;
-  syncUrl();
-  renderChrome();
-  void load();
-}
-
-function shiftDay(delta: number): void {
-  const d = new Date(2024, state.month - 1, state.day + delta);
-  setDate(d.getMonth() + 1, d.getDate());
-}
-
-$('#prev-day').addEventListener('click', () => shiftDay(-1));
-$('#next-day').addEventListener('click', () => shiftDay(1));
-$('#today').addEventListener('click', () => {
-  const now = new Date();
-  setDate(now.getMonth() + 1, now.getDate());
+const sheet = $<HTMLDialogElement>('settings');
+$('open-settings').addEventListener('click', () => sheet.showModal());
+$('close-settings').addEventListener('click', () => sheet.close());
+sheet.addEventListener('click', (e) => {
+  if (e.target === sheet) sheet.close();
 });
-$<HTMLInputElement>('#date-input').addEventListener('change', (e) => {
-  const v = (e.target as HTMLInputElement).value;
-  const m = /^\d{4}-(\d{2})-(\d{2})$/.exec(v);
-  if (m) setDate(Number(m[1]), Number(m[2]));
-});
-$('#date-button').addEventListener('click', () => {
-  const input = $<HTMLInputElement>('#date-input');
-  if (typeof input.showPicker === 'function') {
-    try {
-      input.showPicker();
-      return;
-    } catch {
-      // Fall through to focusing the input.
-    }
-  }
-  input.focus();
-});
-prevBtn.addEventListener('click', () => deck.prev());
-nextBtn.addEventListener('click', () => deck.next());
-
+$('prev').addEventListener('click', () => stage.go(-1));
+$('next').addEventListener('click', () => stage.go(1));
+window.addEventListener('resize', placeTabInk);
 document.addEventListener('keydown', (e) => {
-  if (e.altKey || e.ctrlKey || e.metaKey) return;
-  const target = e.target as HTMLElement;
-  if (target.closest('input, textarea, select, [contenteditable]')) return;
+  if (sheet.open || e.altKey || e.ctrlKey || e.metaKey) return;
   if (e.key === 'ArrowRight') {
     e.preventDefault();
-    deck.next();
+    stage.go(1);
   } else if (e.key === 'ArrowLeft') {
     e.preventDefault();
-    deck.prev();
+    stage.go(-1);
   }
 });
 
