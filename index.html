@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="What happened on this day in history, as a stack of story cards. English, 中文, 日本語." />
+    <meta name="theme-color" content="#efe9dc" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>On this day</title>
+  </head>
+  <body>
+    <div class="app">
+      <header class="top">
+        <div class="brand">
+          <h1 id="title">On this day</h1>
+          <p id="tagline"></p>
+        </div>
+        <nav id="langs" class="langs" aria-label="Language"></nav>
+      </header>
+
+      <section class="datebar">
+        <button id="prev-day" class="icon-btn" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+        </button>
+        <button id="date-button" class="date" type="button">
+          <span id="date-label"></span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5" /></svg>
+        </button>
+        <input id="date-input" class="date-input" type="date" tabindex="-1" />
+        <button id="next-day" class="icon-btn" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+        </button>
+        <button id="today" class="btn btn-quiet" type="button"></button>
+      </section>
+
+      <div id="kinds" class="tabs" role="tablist"></div>
+
+      <main class="stage">
+        <button id="prev" class="nav-btn" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+        </button>
+        <div class="deck-wrap">
+          <div id="deck" class="deck" aria-live="polite"></div>
+          <div id="status" class="status" role="status" hidden></div>
+        </div>
+        <button id="next" class="nav-btn" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+        </button>
+      </main>
+
+      <div class="meta">
+        <span id="counter" class="counter"></span>
+        <span id="hint" class="hint"></span>
+      </div>
+
+      <footer class="footer">
+        <p id="local-hint"></p>
+        <p>
+          <span id="footer-text"></span>
+          <a href="https://github.com/nickwang94/histoday" target="_blank" rel="noopener">GitHub</a>
+        </p>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
