@@ -1,21 +1,39 @@
 # histoday
 
-What happened on this day in history, shown as a small stack of paper story cards.
+What happened today in history, one story at a time, on a split-flap departures board.
 
 - **Data:** Wikipedia "On this day". English and Chinese use the Wikimedia REST feed
   (`https://{lang}.wikipedia.org/api/rest_v1/feed/onthisday/all/MM/DD`). The feed does not
   support Japanese, so for `ja` the app parses the ja.wikipedia date article (`11月24日`), with its
   できごと / 誕生日 / 忌日 sections, and looks up images and descriptions for the linked articles.
-- **Cards:** each event has a year, its description, the main linked article (title, short
-  description, extract) and a thumbnail. If there is no image, or it fails to load, a paper placeholder
-  showing the year appears instead.
+- **Always today:** the app shows today's date in the reader's time zone. There is no date picker.
+- **Stories:** the year flips into place on split-flap cells, the headline and the main linked
+  article sit below it, and the story's photo fills the top of the screen in black and white, fading
+  into the board. Stories without a photo (or whose photo fails to load) show a wall of blank flaps.
 - **Navigation:** swipe on touch screens, drag with the mouse, use the ← → arrow keys, or use the
-  on-screen buttons. You can also switch between Events / Births / Deaths and change the date.
+  prev/next buttons (shown on devices with a mouse). The text follows the finger with a spring, and
+  the photo crossfades in step with it. Switch between Events / Births / Deaths with the tabs.
+- **Settings:** the gear icon opens a sheet with the language switch, an about note and credits.
 - **Languages:** English, 中文 (Simplified), 日本語 for both UI and content. Each language loads its own
   Wikipedia and lists stories about its "home" country first: US/UK for English, China for Chinese,
   Japan for Japanese. Keywords are matched against the event text and the linked article titles
-  (see `src/shared/ranking.ts`). Matching cards carry a small tag.
-- **Deep links:** `?lang=ja&date=11-24&kind=births`.
+  (see `src/shared/ranking.ts`). Matching stories carry a small tag. The language choice is
+  remembered in `localStorage`.
+- **Deep links:** `?lang=ja&kind=births`.
+- **Layout:** mobile-first. Phones and portrait screens scale one layout to the viewport; landscape
+  screens 900px and wider put the board on the left and the photo on the right.
+
+## Design
+
+The look is a station departures board: matte black, flap white and one signal yellow.
+
+- Headlines use Sofia Sans Extra Condensed and the UI uses Sofia Sans. Both are self-hosted
+  through Fontsource, with no external font requests.
+- Photos are rendered in grayscale so every story sits in the same world.
+- Motion is limited to the flap flip, the spring-driven story switch and the settings sheet.
+  `prefers-reduced-motion` turns all three into instant changes.
+
+Design notes live in `PRODUCT.md` and `DESIGN.md`.
 
 ## Tech
 
@@ -29,8 +47,9 @@ What happened on this day in history, shown as a small stack of paper story card
 
 ```
 src/
-  main.ts            UI wiring, state, URL sync
-  deck.ts            paper card stack + pointer/touch drag
+  main.ts            UI wiring, state, settings sheet, URL sync
+  stage.ts           split-flap year + spring-driven story switch with photo crossfade
+  styles.css         all styles (mobile first)
   i18n.ts            UI strings (en / zh / ja)
   api.ts             Function-first loader with direct-Wikipedia fallback
   shared/            data layer shared with the Pages Function
@@ -46,7 +65,8 @@ Requires Node.js 20+.
 
 ```bash
 npm install
-npm run dev        # Vite dev server at http://localhost:5173 (browser talks to Wikipedia directly)
+npm run dev        # Vite dev server at http://localhost:5173 (browser talks to Wikipedia directly;
+                   # add ?fixture=comp for an offline sample day)
 npm run pages:dev  # production build + Pages Function via wrangler at http://localhost:8788
 npm test           # unit tests (parser, ranking, feed normalization)
 npm run build      # type-check + build into dist/
@@ -80,5 +100,5 @@ preview URL.
 ## Attribution
 
 Content comes from [Wikipedia](https://www.wikipedia.org/) under
-[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Each card links to its source
+[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Each story links to its source
 article.

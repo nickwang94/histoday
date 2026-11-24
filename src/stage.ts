@@ -166,6 +166,13 @@ export class Stage<T extends Slide> {
     s.addEventListener('pointerup', this.up);
     s.addEventListener('pointercancel', this.up);
     s.addEventListener('dragstart', (e) => e.preventDefault());
+    for (const img of o.backdrop) {
+      img.addEventListener('load', () => this.loaded(img));
+      img.addEventListener('error', () => {
+        img.dataset.empty = 'true';
+        img.style.opacity = '0';
+      });
+    }
     s.addEventListener(
       'click',
       (e) => {
@@ -192,7 +199,7 @@ export class Stage<T extends Slide> {
     this.applyText(0, 0);
     const [a, b] = this.o.backdrop;
     this.showImage(a, items[this.index]?.image);
-    a.style.opacity = items[this.index]?.image ? '1' : '0';
+    a.style.opacity = a.dataset.empty ? '0' : '1';
     a.style.transform = '';
     b.style.opacity = '0';
     this.front = 0;
@@ -228,8 +235,23 @@ export class Stage<T extends Slide> {
       img.dataset.empty = 'true';
       return;
     }
+    if (img.getAttribute('src') === src && img.complete && img.naturalWidth > 0) return this.loaded(img);
+    img.dataset.empty = 'true';
+    delete img.dataset.fit;
+    img.src = src;
+  }
+
+  /** A photo counts only once decoded; a small original is shown whole instead of stretched. */
+  private loaded(img: HTMLImageElement): void {
+    if (!img.naturalWidth) return;
     delete img.dataset.empty;
-    if (img.getAttribute('src') !== src) img.src = src;
+    const needed = img.clientWidth * Math.max(0.8, Math.min(devicePixelRatio || 1, 2) * 0.55);
+    img.dataset.fit = img.naturalWidth < needed ? 'contain' : 'cover';
+    const settled = this.progress === 0 && this.target === 0 && !this.drag?.active;
+    if (settled && img === this.o.backdrop[this.front]) {
+      img.style.opacity = '1';
+      if (!reduceMotion()) img.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 420, easing: 'ease-out' });
+    }
   }
 
   private paintText(i: number): void {
@@ -261,7 +283,7 @@ export class Stage<T extends Slide> {
     const frontVisible = frontImg.dataset.empty ? 0 : 1;
     const backVisible = backImg.dataset.empty ? 0 : 1;
     frontImg.style.opacity = String(frontVisible * (1 - e));
-    frontImg.style.transform = `translate3d(${-this.dir * e * 3}%,0,0) scale(${1 + e * 0.04})`;
+    frontImg.style.transform = `translate3d(${-this.dir * e * 3}%,0,0) scale(${1 + e * 0.07})`;
     backImg.style.opacity = String(backVisible * e);
     backImg.style.transform = `translate3d(${this.dir * (1 - e) * 3}%,0,0) scale(${1.08 - e * 0.08})`;
   }

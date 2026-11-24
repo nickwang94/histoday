@@ -147,9 +147,16 @@ function syncUrl(): void {
   history.replaceState(null, '', `${location.pathname}?${q}`);
 }
 
+/** CJK display faces are large, so each loads only for its own language. */
+const cjkFonts: Partial<Record<Lang, () => Promise<unknown>>> = {
+  zh: () => import('@fontsource/noto-sans-sc/800.css'),
+  ja: () => import('@fontsource/noto-sans-jp/800.css'),
+};
+
 function renderChrome(): void {
   const s = t();
   document.documentElement.lang = s.htmlLang;
+  void cjkFonts[state.lang]?.();
   document.title = `histoday · ${s.title}`;
   const date = $('date');
   date.textContent = s.date(state.month, state.day);

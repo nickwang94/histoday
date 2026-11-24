@@ -1,14 +1,15 @@
 :root {
   --board: #0b0b0b;
-  --flap: #161616;
-  --flap-edge: #2c2c2c;
+  --flap: #191919;
+  --flap-edge: #747474;
   --ink: #f2f1ee;
   --ink-2: #a9a9a6;
-  --ink-3: #6c6c69;
+  --ink-3: #8c8c88;
   --rule: #363636;
   --signal: #f2b824;
   /* One comp pixel: the approved comp is 720 wide. */
-  --u: calc(min(100vw, 720px) / 720);
+  --u: min(100vw / 720, 100svh / 1280);
+  --side: max(0px, (100vw - 720 * var(--u)) / 2);
   --display: 'Sofia Sans Extra Condensed', 'Arial Narrow', sans-serif;
   --ui: 'Sofia Sans', system-ui, sans-serif;
   --cjk: system-ui;
@@ -17,11 +18,13 @@
 }
 
 :lang(zh) {
-  --cjk: 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Noto Sans CJK SC', 'Source Han Sans SC', 'Microsoft YaHei';
+  --cjk-display: 'Noto Sans SC';
+  --cjk: 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Source Han Sans SC', 'Microsoft YaHei';
 }
 
 :lang(ja) {
-  --cjk: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Noto Sans CJK JP', 'Source Han Sans JP', 'Yu Gothic',
+  --cjk-display: 'Noto Sans JP';
+  --cjk: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans CJK JP', 'Source Han Sans JP', 'Yu Gothic',
     Meiryo;
 }
 
@@ -99,6 +102,22 @@ svg {
   pointer-events: none;
   -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 9%, #000 52%, transparent 100%);
   mask-image: linear-gradient(to bottom, transparent 0%, #000 9%, #000 52%, transparent 100%);
+  /* An empty board of blank flaps shows through when a story has no photo. */
+  --tile-w: calc(60 * var(--u));
+  --tile-h: calc(84 * var(--u));
+  --gap: calc(8 * var(--u));
+  background-color: #111;
+  background-image:
+    linear-gradient(to right, var(--board) var(--gap), transparent var(--gap)),
+    linear-gradient(to bottom, var(--board) var(--gap), transparent var(--gap)),
+    linear-gradient(
+      to bottom,
+      transparent calc(50% + var(--gap) / 2 - 1px),
+      var(--board) calc(50% + var(--gap) / 2 - 1px) calc(50% + var(--gap) / 2 + 1px),
+      transparent calc(50% + var(--gap) / 2 + 1px)
+    );
+  background-size: var(--tile-w) var(--tile-h);
+  background-position: calc(50% + var(--gap) / 2) 0;
 }
 
 .backdrop-img {
@@ -108,7 +127,17 @@ svg {
   height: 100%;
   object-fit: cover;
   object-position: 50% 30%;
-  filter: grayscale(1) contrast(1.08) brightness(0.9);
+  filter: grayscale(1) contrast(1.08) brightness(0.88);
+  background: var(--board);
+}
+
+.backdrop-img:not([src]) {
+  visibility: hidden;
+}
+
+.backdrop-img[data-fit='contain'] {
+  object-fit: contain;
+  background: transparent;
   opacity: 0;
   will-change: opacity, transform;
   user-select: none;
@@ -131,7 +160,7 @@ svg {
   align-items: center;
   gap: calc(16 * var(--u));
   height: calc(86 * var(--u) + env(safe-area-inset-top));
-  padding: calc(8 * var(--u) + env(safe-area-inset-top)) calc(27 * var(--u)) 0 calc(22 * var(--u));
+  padding: calc(8 * var(--u) + env(safe-area-inset-top)) calc(var(--side) + 27 * var(--u)) 0 calc(var(--side) + 22 * var(--u));
   border-bottom: 1px solid var(--rule);
   background: var(--board);
 }
@@ -195,7 +224,7 @@ svg {
   flex: none;
   display: flex;
   justify-content: space-between;
-  padding: calc(1 * var(--u)) calc(82 * var(--u)) 0 calc(76 * var(--u));
+  padding: calc(1 * var(--u)) calc(var(--side) + 82 * var(--u)) 0 calc(var(--side) + 76 * var(--u));
   height: calc(74 * var(--u));
   border-bottom: 1px solid var(--rule);
   background: var(--board);
@@ -241,7 +270,7 @@ svg {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: 0 calc(35 * var(--u)) calc(50 * var(--u) + env(safe-area-inset-bottom));
+  padding: 0 calc(var(--side) + 35 * var(--u)) calc(50 * var(--u) + env(safe-area-inset-bottom));
   touch-action: pan-y;
   user-select: none;
   -webkit-user-select: none;
@@ -292,7 +321,7 @@ svg {
   height: 50%;
   overflow: hidden;
   background: var(--flap);
-  border: 1px solid var(--flap-edge);
+  border: max(1px, calc(1.5 * var(--u))) solid var(--flap-edge);
   backface-visibility: hidden;
 }
 
@@ -301,7 +330,7 @@ svg {
   top: 0;
   border-bottom: 0;
   border-radius: calc(8 * var(--u)) calc(8 * var(--u)) 0 0;
-  background: linear-gradient(to bottom, #1b1b1b, #151515);
+  background: linear-gradient(to bottom, #1c1c1c, #181818);
   transform-origin: 50% 100%;
 }
 
@@ -310,7 +339,7 @@ svg {
   bottom: 0;
   border-top: 0;
   border-radius: 0 0 calc(8 * var(--u)) calc(8 * var(--u));
-  background: linear-gradient(to bottom, #121212, #171717);
+  background: linear-gradient(to bottom, #131313, #171717);
   transform-origin: 50% 0;
 }
 
@@ -380,7 +409,7 @@ svg {
   font-size: calc(80 * var(--u));
   line-height: 0.96;
   letter-spacing: 0;
-  text-wrap: balance;
+  text-wrap: pretty;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 6;
@@ -404,10 +433,13 @@ svg {
 
 :lang(zh) .headline,
 :lang(ja) .headline {
+  font-family: var(--cjk-display), var(--cjk), sans-serif;
   font-weight: 800;
   line-height: 1.18;
   font-size: calc(56 * var(--u));
   letter-spacing: 0.01em;
+  line-break: strict;
+  word-break: auto-phrase;
 }
 
 :lang(zh) .headline[data-size='l'],
@@ -537,11 +569,9 @@ body[data-state='loading'] .status p::after {
 .local {
   font-family: var(--ui), var(--cjk), sans-serif;
   font-weight: 600;
-  font-size: calc(21 * var(--u));
-  letter-spacing: 0.08em;
-  padding: calc(4 * var(--u)) calc(10 * var(--u));
-  color: var(--board);
-  background: var(--signal);
+  font-size: calc(24 * var(--u));
+  letter-spacing: 0.06em;
+  color: var(--ink-2);
 }
 
 .local[hidden] {
@@ -657,7 +687,7 @@ body[data-state='loading'] .status p::after {
   min-height: 56px;
   padding: 0 18px;
   background: var(--flap);
-  border: 1px solid var(--flap-edge);
+  border: 1px solid var(--rule);
   border-radius: 6px;
   font-family: var(--display), var(--cjk), sans-serif;
   font-weight: 700;
@@ -718,42 +748,40 @@ body[data-state='loading'] .status p::after {
 
 /* ---------- Wide screens: photo owns the right, board column on the left ---------- */
 
-@media (min-width: 900px) {
+@media (min-width: 900px) and (min-aspect-ratio: 1/1) {
   :root {
-    --u: clamp(0.62px, calc(100svh / 1180), 1px);
+    --u: clamp(0.62px, calc(100svh / 1000), 1.3px);
+    --side: 0px;
+    --edge: max(40px, 4.5vw);
+    --col: min(calc(720 * var(--u)), 48vw);
   }
 
-  .bar,
-  .tabs {
+  .bar {
+    padding-left: var(--edge);
+    padding-right: var(--edge);
     background: transparent;
-  }
-
-  .bar {
-    padding-left: max(40px, 4vw);
-    padding-right: max(32px, 3.5vw);
+    border-bottom-color: rgba(255, 255, 255, 0.12);
   }
 
   .tabs {
-    width: calc(720 * var(--u));
-    margin-left: max(26px, calc(4vw - 35 * var(--u)));
+    justify-content: flex-start;
+    gap: calc(64 * var(--u));
+    padding: calc(1 * var(--u)) 0 0 var(--edge);
+    background: transparent;
     border-bottom: 0;
-  }
-
-  .bar {
-    border-bottom-color: rgba(255, 255, 255, 0.12);
   }
 
   .backdrop {
     top: 0;
     left: auto;
-    width: 74vw;
+    width: 72vw;
     height: 100svh;
     -webkit-mask-image:
-      linear-gradient(to right, transparent 0%, #000 42%),
-      linear-gradient(to bottom, #000 55%, transparent 100%);
+      linear-gradient(to right, transparent 0%, #000 45%),
+      linear-gradient(to bottom, transparent 0%, #000 14%, #000 62%, transparent 100%);
     mask-image:
-      linear-gradient(to right, transparent 0%, #000 42%),
-      linear-gradient(to bottom, #000 55%, transparent 100%);
+      linear-gradient(to right, transparent 0%, #000 45%),
+      linear-gradient(to bottom, transparent 0%, #000 14%, #000 62%, transparent 100%);
     -webkit-mask-composite: source-in;
     mask-composite: intersect;
   }
@@ -763,20 +791,13 @@ body[data-state='loading'] .status p::after {
   }
 
   .stage {
-    padding-left: max(40px, 4vw);
-    padding-right: max(40px, 4vw);
-    padding-bottom: max(36px, 5svh);
+    padding: 0 var(--edge) max(40px, 6svh);
   }
 
   .story,
   .progress,
   .foot {
-    width: calc(720 * var(--u));
-    max-width: 100%;
-  }
-
-  .flaps {
-    width: calc(650 * var(--u));
+    width: var(--col);
   }
 }
 
